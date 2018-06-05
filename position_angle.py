@@ -27,6 +27,25 @@ import requests
 import numpy as np
 from scipy.stats import chi2
 
+def reject_invalid(variables,bad_flag=None):
+    '''
+    This function takes in a list of variables stored in numpy arrays and returns these arrays where there are no nans.
+    variables=[variable1,variable2,variable3...]
+    bad_flag=a value that denotes bad data e.g. -999
+    '''
+    if type(variables)!=list:
+        print("please input a list of numpy arrays")
+        return
+    good=np.ones(variables[0].shape)
+    for var in variables:
+        if type(var[0])!=str and type(var[0])!=np.str_:
+            bad=np.where((np.isnan(var)==True) | (np.isinf(var)==True) | (var==bad_flag))
+            good[bad]=0
+    var_out=[]
+    for var in variables:
+        var_out.append(var[good==1])
+    return var_out
+
 def plot_point(point, angle, length=100):
      '''
      point - Tuple (x, y)
@@ -102,9 +121,10 @@ def get_plot(iden):
     
     plot_image(plate_number, fiber_number)
     plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err))
-    plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa)
+    plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity)
     
-    plt.show()
+    #plt.show()
+    plt.savefig('/home/celeste/Documents/astro_research/summer_2018/position_angle/pa_' + str(plate_id) + '.png')
     print("finished with this one")
     plt.close('all')
     
@@ -136,11 +156,14 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
         vel_final = abs(vel_max)
         want = vel_min
         
+    dist = np.where(r_Re == np.min(r_Re))
     x, endx, y, endy = plot_point((0,0), pa-90)
     
     
     #plots the velocity map
     imgplot = plt.imshow(velocity, origin = "lower", cmap = "RdYlBu_r", extent = shapemap, vmin = -vel_final, vmax = vel_final, zorder = 2)
+    #adds the colorbar
+    cb = plt.colorbar(shrink = .7, mappable = imgplot)
     #Adds a contour line for the one effective radius
     css = plt.gca().contour(r_Re*2,[2],extent=shapemap, colors='springgreen', origin = 'lower', zorder = 5)
     #adds the contors from the i band image
@@ -148,24 +171,6 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     axes = plt.gca()
     ylim = axes.get_ylim()
     xlim = axes.get_xlim()
-    
-    axes.set_ylim(ylim)
-    axes.set_xlim(xlim)
-    
-    xbin, ybin = np.random.uniform(low=[-want, -want+10], high=[want, want - 10], size = velocity.shape).T
-    
-    angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin,velocity-np.median(velocity))
-    x2, endx2, y2, endy2 = plot_point((0,0), angBest-90)
-    
-    plt.plot([x, endx], [y, endy], color = 'darkorchid', zorder = 4)
-    plt.plot([x2, endx2], [y2, endy2], color = 'turquoise', zorder = 5)
-    
-    plt.title("Gas Velocity")
-    plt.xlabel('Arcseconds')
-    plt.ylabel('Arcseconds')
-    
-    #adds the colorbar
-    cb = plt.colorbar(shrink = .7)
     
     #If all the velocities are less than zero, we make sure to get all of the correct velocities on the plot. 
     if ((vel_min <=0) and (vel_max <=0)):
@@ -175,7 +180,49 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     cb.set_label('km/s', rotation = 270, labelpad = 25)
     a.set_facecolor('white')
     
-def plot_iband(plate_num, fiber_num, iband, err, pa):
+    axes.set_ylim(ylim)
+    axes.set_xlim(xlim)
+    
+    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re)
+    
+    plt.plot([x, endx], [y, endy], color = 'darkorchid', zorder = 4, label = 'PA from data')
+    plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
+    plt.plot([x2, endx2], [y2, endy2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
+    
+    plt.legend(prop={'size': 12})
+    
+    plt.title("Gas Velocity")
+    plt.xlabel('Arcseconds')
+    plt.ylabel('Arcseconds')
+    
+def fit_kin(velocity, r_Re, offset = 0):
+    dist = np.where(r_Re == np.min(r_Re))
+    
+    ybin, xbin = np.indices(velocity.shape)
+    
+    ybin = ybin - dist[1]
+    xbin = xbin - dist[0]
+    
+    ybin = ybin.ravel()
+    xbin = xbin.ravel()
+    velocity = velocity.ravel()
+    
+    xzero = xbin[dist[0]]+dist[0]
+    yzero = ybin[dist[1]]+dist[1]
+    print(xzero)
+    print(yzero)
+    
+    [ybin, xbin, velocity] = reject_invalid([ybin, xbin, velocity])
+    
+    angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin,velocity-np.median(velocity), nsteps = 30, plot = False)
+    x2, endx2, y2, endy2 = plot_point((float(xzero),float(yzero)), angBest-90+offset)
+    return x2, endx2, y2, endy2
+   
+    
+
+    
+def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     global shapemap
     global r_Re
     global fig
@@ -193,11 +240,22 @@ def plot_iband(plate_num, fiber_num, iband, err, pa):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
+    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = 90)
+    
+    dist = np.where(r_Re == np.min(r_Re))
+    print(dist[0])
+    print(dist[1])
     x, endx, y, endy = plot_point((0,0), pa)
     
-    plt.plot([y, endy], [x, endx], color = 'darkorchid')
-    
+    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data")
+    data = plt.plot([-y, -endy], [-x, -endx], color = 'darkorchid')
+    kinematics = plt.plot([y2, endy2],[x2, endx2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
+    kinematics = plt.plot([-y2, -endy2],[-x2, -endx2], color = 'turquoise', zorder = 6)
     axes.invert_yaxis()
+    plt.legend(prop={'size': 12})
+
+    
+
 
     plt.title("i-band Image")
     
@@ -213,14 +271,13 @@ def plot_image(plate_num, fiber_num):
         image = img.imread('/home/celeste/Documents/astro_research/astro_images/marvin_images/' + str(plate_num) + '-' + str(fiber_num) + '.png')
     except ValueError:
         print("No image.")
-    lum_img = image[:,:,0]
     #plt.subplot(121)
     
     
     imgplot = plt.imshow(image)
     
 shapemap = [0,0,0,0]
-fig = plt.figure(figsize=(30,9), facecolor='white')
+fig = plt.figure(figsize=(28,7), facecolor='white')
 r_Re = []
 ylim = 0
 xlim = 0
