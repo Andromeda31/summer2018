@@ -46,7 +46,7 @@ def reject_invalid(variables,bad_flag=None):
         var_out.append(var[good==1])
     return var_out
 
-def plot_point(point, angle, length=1000):
+def plot_point(point, angle, length=100):
      '''
      point - Tuple (x, y)
      angle - Angle you want your end point at in degrees.
@@ -192,7 +192,7 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     
     plt.plot([x, endx], [y, endy], color = 'darkorchid', zorder = 4, label = 'PA from data')
     #plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
-    plt.plot([y2, endy2], [x2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    plt.plot([x2, endx2],[y2, endy2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
     #plt.plot([x2], [y2], color = 'turquoise', marker = '.', zorder = 6, label = 'PA from kinematics')
     #plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
     
@@ -207,7 +207,7 @@ def fit_kin(velocity, r_Re, offset = 0):
     dist = np.where(r_Re == np.min(r_Re))
     
     
-    xbin, ybin = np.indices(velocity.shape)
+    ybin, xbin = np.indices(velocity.shape)
     
     ybin = ybin - dist[1]
     xbin = xbin - dist[0]
@@ -273,7 +273,7 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = 180)
+    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = 0)
     
     dist = np.where(r_Re == np.min(r_Re))
     print(dist[0])
@@ -283,7 +283,7 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     
     data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data", zorder = 5)
     #data = plt.plot([-y, -endy], [-x, -endx], color = 'darkorchid')
-    kinematics = plt.plot([x2, endx2], [y2, endy2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
+    kinematics = plt.plot([y2, endy2],[x2, endx2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
     #kinematics = plt.plot([y2],[x2], color = 'turquoise', marker = '.', zorder = 5, label = "PA from kinematics")
     #kinematics = plt.plot([-y2, -endy2],[-x2, -endx2], color = 'turquoise', zorder = 6)
     axes.invert_yaxis()
@@ -320,7 +320,7 @@ xlim = 0
 filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
 files = get_filenames(filename)
 
-#files = ['7443-12702']
+files = ['7443-12702']
 
 for x in range(0, len(files)):
     fig = plt.figure(figsize=(30,9), facecolor='white')
