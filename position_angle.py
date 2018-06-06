@@ -145,6 +145,7 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     
     badpix_vel = ((velocity_err) > 25)
     velocity[badpix_vel]=np.nan
+    more_bad = (velocity / velocity_err) < 3
     
     #Finds the 95th and 5th percentiles
     vel_min = np.nanpercentile(velocity, 5)
@@ -169,7 +170,7 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     #adds the colorbar
     cb = plt.colorbar(shrink = .7, mappable = imgplot)
     #Adds a contour line for the one effective radius
-    css = plt.gca().contour(r_Re*2,[2],extent=shapemap, colors='springgreen', origin = 'lower', zorder = 5)
+    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='springgreen', origin = 'lower', zorder = 5)
     #adds the contors from the i band image
     csss=plt.gca().contour(contours_i, 8, colors = 'k', alpha = 0.6, extent = shapemap, zorder = 3)
     axes = plt.gca()
