@@ -46,7 +46,7 @@ def reject_invalid(variables,bad_flag=None):
         var_out.append(var[good==1])
     return var_out
 
-def plot_point(point, angle, length=100):
+def plot_point(point, angle, length=1000):
      '''
      point - Tuple (x, y)
      angle - Angle you want your end point at in degrees.
@@ -59,8 +59,10 @@ def plot_point(point, angle, length=100):
      x, y = point
 
      # find the end point
-     endy = length * math.sin(math.radians(angle))
-     endx = length * math.cos(math.radians(angle))
+     endy = length * math.sin(math.radians(angle)) + y
+     endx = length * math.cos(math.radians(angle)) + x
+     y = -length * math.sin(math.radians(angle)) + y
+     x = -length * math.cos(math.radians(angle)) + x
      
      return x, endx, y, endy
 
@@ -157,7 +159,9 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
         want = vel_min
         
     dist = np.where(r_Re == np.min(r_Re))
-    x, endx, y, endy = plot_point((0,0), pa-90)
+    
+    xzero, yzero = find_new_center(shapemap, velocity, dist)
+    x, endx, y, endy = plot_point((xzero,yzero), pa-90)
     
     
     #plots the velocity map
@@ -183,12 +187,13 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re)
+    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = -90)
     
     plt.plot([x, endx], [y, endy], color = 'darkorchid', zorder = 4, label = 'PA from data')
-    plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
-    plt.plot([x2, endx2], [y2, endy2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
-    plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
+    #plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
+    plt.plot([y2, endy2], [x2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    #plt.plot([x2], [y2], color = 'turquoise', marker = '.', zorder = 6, label = 'PA from kinematics')
+    #plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
     
     plt.legend(prop={'size': 12})
     
@@ -197,30 +202,55 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     plt.ylabel('Arcseconds')
     
 def fit_kin(velocity, r_Re, offset = 0):
+    global shapemap
     dist = np.where(r_Re == np.min(r_Re))
     
-    ybin, xbin = np.indices(velocity.shape)
+    
+    xbin, ybin = np.indices(velocity.shape)
     
     ybin = ybin - dist[1]
     xbin = xbin - dist[0]
     
     ybin = ybin.ravel()
     xbin = xbin.ravel()
+    velocity_notravel = velocity
     velocity = velocity.ravel()
-    
-    xzero = xbin[dist[0]]+dist[0]
-    yzero = ybin[dist[1]]+dist[1]
-    print(xzero)
-    print(yzero)
     
     [ybin, xbin, velocity] = reject_invalid([ybin, xbin, velocity])
     
     angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin,velocity-np.median(velocity), nsteps = 30, plot = False)
-    x2, endx2, y2, endy2 = plot_point((float(xzero),float(yzero)), angBest-90+offset)
-    return x2, endx2, y2, endy2
-   
     
+    xzero, yzero = find_new_center(shapemap, velocity_notravel, dist)
 
+    '''
+    print("left: " + str(left))
+    print("right: " + str(right))
+    print("size_of_vel: " + str(size_of_vel))
+    print("width_of_shapemap: " + str(width_of_shapemap))
+    print("xzero: " + str(xzero))
+    print("yzero: " + str(yzero))
+    print("dist0: " + str(dist[0]))
+    print("dist1: " + str(dist[1]))
+    '''
+    
+    x2, endx2, y2, endy2 = plot_point((xzero, yzero), angBest+offset)
+    #return x2, endx2, y2, endy2
+    return xzero, endx2, yzero, endy2
+    
+def find_new_center(shapemap, velocity, dist):
+    left = shapemap[0]
+    right = shapemap[3]
+    size_of_vel = velocity.shape[0]
+    width_of_shapemap = shapemap[1]-shapemap[0]
+    
+    yzero = left + width_of_shapemap/size_of_vel*(dist[0])
+    xzero = right - width_of_shapemap/size_of_vel*(dist[1])
+    
+    #yzero = left + width_of_shapemap/size_of_vel*(dist[0]+.5)
+    #xzero = right - width_of_shapemap/size_of_vel*(dist[1]+.5)
+    
+    return xzero, yzero
+   
     
 def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     global shapemap
@@ -231,26 +261,30 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     a = fig.add_subplot(1, 3, 2)
     badpix = err < 3
     iband[badpix] = np.nan
-    print(shapemap)
+    print(iband.shape)
+    #iband[5][0] = 1000
     imgplot = plt.imshow(iband, cmap = "viridis", extent = shapemap, zorder = 1)
     css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='r', origin = 'upper', zorder = 2, z = 2)
+    #csss=plt.gca().contour(iband, 8, colors = 'black', alpha = 0.6, extent = shapemap, zorder = 3)
     #plt.gca().invert_yaxis()
     
     axes = plt.gca()
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = 90)
+    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = 180)
     
     dist = np.where(r_Re == np.min(r_Re))
     print(dist[0])
     print(dist[1])
-    x, endx, y, endy = plot_point((0,0), pa)
+    xzero, yzero = find_new_center(shapemap, velocity, dist)
+    x, endx, y, endy = plot_point((xzero,yzero), pa)
     
-    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data")
-    data = plt.plot([-y, -endy], [-x, -endx], color = 'darkorchid')
-    kinematics = plt.plot([y2, endy2],[x2, endx2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
-    kinematics = plt.plot([-y2, -endy2],[-x2, -endx2], color = 'turquoise', zorder = 6)
+    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data", zorder = 5)
+    #data = plt.plot([-y, -endy], [-x, -endx], color = 'darkorchid')
+    kinematics = plt.plot([x2, endx2], [y2, endy2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
+    #kinematics = plt.plot([y2],[x2], color = 'turquoise', marker = '.', zorder = 5, label = "PA from kinematics")
+    #kinematics = plt.plot([-y2, -endy2],[-x2, -endx2], color = 'turquoise', zorder = 6)
     axes.invert_yaxis()
     plt.legend(prop={'size': 12})
 
@@ -284,6 +318,8 @@ xlim = 0
     
 filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
 files = get_filenames(filename)
+
+#files = ['7443-12702']
 
 for x in range(0, len(files)):
     fig = plt.figure(figsize=(30,9), facecolor='white')
