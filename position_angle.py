@@ -59,10 +59,10 @@ def plot_point(point, angle, length=100):
      x, y = point
 
      # find the end point
-     endy = length * math.sin(math.radians(angle)) + y
-     endx = length * math.cos(math.radians(angle)) + x
-     y = -length * math.sin(math.radians(angle)) + y
-     x = -length * math.cos(math.radians(angle)) + x
+     endx = length * math.sin(math.radians(angle)) + x
+     endy = length * math.cos(math.radians(angle)) + y
+     x = -length * math.sin(math.radians(angle)) + x
+     y = -length * math.cos(math.radians(angle)) + y
      
      return x, endx, y, endy
 
@@ -126,7 +126,7 @@ def get_plot(iden):
     plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity)
     
     #plt.show()
-    plt.savefig('/home/celeste/Documents/astro_research/summer_2018/position_angle/pa_' + str(plate_id) + '.png')
+    plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
     print("finished with this one")
     plt.close('all')
     
@@ -161,7 +161,7 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
         
     dist = np.where(r_Re == np.min(r_Re))
     
-    xzero, yzero = find_new_center(shapemap, velocity, dist)
+    yzero, xzero = find_new_center(shapemap, velocity, dist)
     x, endx, y, endy = plot_point((xzero,yzero), pa-90)
     
     
@@ -188,11 +188,14 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = -90)
+    x2, endx2, y2, endy2, bestAng = fit_kin(velocity, r_Re, offset = -90)
     
-    plt.plot([x, endx], [y, endy], color = 'darkorchid', zorder = 4, label = 'PA from data')
+    print(x2, endx2)
+    print(y2, endy2)
+    
+    plt.plot([y, endy], [x, endx], color = 'darkorchid', zorder = 4, label = 'PA from data')
     #plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
-    plt.plot([x2, endx2],[y2, endy2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    plt.plot([-endy2, endy2],[-endx2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
     #plt.plot([x2], [y2], color = 'turquoise', marker = '.', zorder = 6, label = 'PA from kinematics')
     #plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
     
@@ -221,7 +224,7 @@ def fit_kin(velocity, r_Re, offset = 0):
     
     angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin,velocity-np.median(velocity), nsteps = 30, plot = False)
     
-    xzero, yzero = find_new_center(shapemap, velocity_notravel, dist)
+    yzero, xzero = find_new_center(shapemap, velocity_notravel, dist)
 
     '''
     print("left: " + str(left))
@@ -236,7 +239,9 @@ def fit_kin(velocity, r_Re, offset = 0):
     
     x2, endx2, y2, endy2 = plot_point((xzero, yzero), angBest+offset)
     #return x2, endx2, y2, endy2
-    return xzero, endx2, yzero, endy2
+    print(x2, endx2)
+    print(y2, endy2)
+    return xzero, endx2, yzero, endy2, angBest
     
 def find_new_center(shapemap, velocity, dist):
     left = shapemap[0]
@@ -246,6 +251,9 @@ def find_new_center(shapemap, velocity, dist):
     
     yzero = left + width_of_shapemap/size_of_vel*(dist[0])
     xzero = right - width_of_shapemap/size_of_vel*(dist[1])
+    
+    print('xzero ' + str(xzero))
+    print('yzero ' + str(yzero))
     
     #yzero = left + width_of_shapemap/size_of_vel*(dist[0]+.5)
     #xzero = right - width_of_shapemap/size_of_vel*(dist[1]+.5)
@@ -264,8 +272,8 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     iband[badpix] = np.nan
     print(iband.shape)
     #iband[5][0] = 1000
-    imgplot = plt.imshow(iband, cmap = "viridis", extent = shapemap, zorder = 1)
-    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='r', origin = 'upper', zorder = 2, z = 2)
+    imgplot = plt.imshow(iband, cmap = "viridis", extent = shapemap, zorder = 1, origin = 'lower')
+    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='r', origin = 'lower', zorder = 2, z = 2)
     #csss=plt.gca().contour(iband, 8, colors = 'black', alpha = 0.6, extent = shapemap, zorder = 3)
     #plt.gca().invert_yaxis()
     
@@ -273,20 +281,24 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2 = fit_kin(velocity, r_Re, offset = 0)
+    x2, endx2, y2, endy2, bestAng = fit_kin(velocity, r_Re, offset = -90)
+    
+    print(x2, endx2)
+    print(y2, endy2)
     
     dist = np.where(r_Re == np.min(r_Re))
     print(dist[0])
     print(dist[1])
-    xzero, yzero = find_new_center(shapemap, velocity, dist)
-    x, endx, y, endy = plot_point((xzero,yzero), pa)
+    yzero, xzero = find_new_center(shapemap, velocity, dist)
+    x, endx, y, endy = plot_point((xzero,yzero), pa+90)
     
-    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data", zorder = 5)
-    #data = plt.plot([-y, -endy], [-x, -endx], color = 'darkorchid')
-    kinematics = plt.plot([y2, endy2],[x2, endx2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
+    
+    #data = plt.plot([x, endx], [y, endy], color = 'darkorchid', label = "PA from data", zorder = 5)
+    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data: " + str(pa))
+    #kinematics = plt.plot([x2, endx2],[y2, endy2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
     #kinematics = plt.plot([y2],[x2], color = 'turquoise', marker = '.', zorder = 5, label = "PA from kinematics")
-    #kinematics = plt.plot([-y2, -endy2],[-x2, -endx2], color = 'turquoise', zorder = 6)
-    axes.invert_yaxis()
+    kinematics = plt.plot([-endy2, endy2],[-endx2, endx2], color = 'turquoise', zorder = 6, label = "PA from kinematics: " + str(bestAng))
+    #axes.invert_yaxis()
     plt.legend(prop={'size': 12})
 
     
@@ -320,7 +332,7 @@ xlim = 0
 filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
 files = get_filenames(filename)
 
-files = ['7443-12702']
+#files = ['7443-12702']
 
 for x in range(0, len(files)):
     fig = plt.figure(figsize=(30,9), facecolor='white')
