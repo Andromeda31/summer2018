@@ -103,6 +103,10 @@ def get_plot(iden):
     plate_number = hdulist['PRIMARY'].header['PLATEID']
     fiber_number = hdulist['PRIMARY'].header['IFUDSGN']
     velocity, velocity_err = get_buncha_data(hdulist, logcube)
+    stel_vel = hdulist['STELLAR_VEL'].data
+    stel_vel_err = (hdulist['STELLAR_VEL_IVAR'].data)**(-0.5)
+    
+
     
     errs=(hdulist['EMLINE_GFLUX_IVAR'].data)**-0.5
     fluxes = hdulist['EMLINE_GFLUX'].data
@@ -124,28 +128,31 @@ def get_plot(iden):
     plot_image(plate_number, fiber_number)
     plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err))
     plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity)
+    plot_stellar_kin(plate_id, stel_vel, stel_vel_err, contours_i, pa, (stel_vel/stel_vel_err))
     
     #plt.show()
     plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
     print("finished with this one")
     plt.close('all')
     
-    
-def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
+def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err):
     global shapemap
     global r_Re
     global fig
     global ylim
     global xlim
     
-    a = fig.add_subplot(1, 3, 3)
+    a = fig.add_subplot(1, 4, 4)
     
     badpix = err < 3
-    contours_i[badpix] = np.nan
+    #contours_i[badpix] = np.nan
+    
+    print(velocity_err)
     
     badpix_vel = ((velocity_err) > 25)
     velocity[badpix_vel]=np.nan
     more_bad = (velocity / velocity_err) < 3
+    #velocity[more_bad] = np.nan
     
     #Finds the 95th and 5th percentiles
     vel_min = np.nanpercentile(velocity, 5)
@@ -166,6 +173,87 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     
     
     #plots the velocity map
+    print('stellar velocity ' + str(velocity[0,0]))
+    imgplot = plt.imshow(velocity, origin = "lower", cmap = "RdYlBu_r", extent = shapemap, vmin = -vel_final, vmax = vel_final, zorder = 2)
+    #adds the colorbar
+    cb = plt.colorbar(shrink = .7, mappable = imgplot)
+    #Adds a contour line for the one effective radius
+    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='springgreen', origin = 'lower', zorder = 5)
+    #adds the contors from the i band image
+    csss=plt.gca().contour(contours_i, 8, colors = 'k', alpha = 0.6, extent = shapemap, zorder = 3)
+    axes = plt.gca()
+    ylim = axes.get_ylim()
+    xlim = axes.get_xlim()
+    
+    #If all the velocities are less than zero, we make sure to get all of the correct velocities on the plot. 
+    if ((vel_min <=0) and (vel_max <=0)):
+        plt.clim(-vel_final, want)
+    else:
+        plt.clim(-vel_final,vel_final)
+    cb.set_label('km/s', rotation = 270, labelpad = 25)
+    a.set_facecolor('white')
+    
+    axes.set_ylim(ylim)
+    axes.set_xlim(xlim)
+    axes.set_facecolor('white')
+    
+    x2, endx2, y2, endy2, bestAng = fit_kin(velocity, r_Re, offset = -90)
+    
+    print(x2, endx2)
+    print(y2, endy2)
+    
+    plt.plot([y, endy], [x, endx], color = 'darkorchid', zorder = 4, label = 'PA from data')
+    #plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
+    plt.plot([-endy2, endy2],[-endx2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    #plt.plot([x2], [y2], color = 'turquoise', marker = '.', zorder = 6, label = 'PA from kinematics')
+    #plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
+    
+    plt.legend(prop={'size': 12})
+    
+    plt.title("Stellar Velocity")
+    plt.xlabel('Arcseconds')
+    plt.ylabel('Arcseconds')
+    
+    
+def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
+    global shapemap
+    global r_Re
+    global fig
+    global ylim
+    global xlim
+    
+    
+    a = fig.add_subplot(1, 4, 3)
+    
+    badpix = err < 3
+    contours_i[badpix] = np.nan
+    
+    badpix_vel = ((velocity_err) > 25)
+    velocity[badpix_vel]=np.nan
+    more_bad = (velocity / velocity_err) < 3
+    #velocity[more_bad] = np.nan
+    
+    
+    #Finds the 95th and 5th percentiles
+    vel_min = np.nanpercentile(velocity, 5)
+    vel_max = np.nanpercentile(velocity, 95)
+    
+    #Want to find the largest absolute value of min or max. We will use this to create a consistent velocity map
+    if abs(vel_min) > abs(vel_max):
+        vel_final = abs(vel_min)
+        want = vel_max
+    else:
+        vel_final = abs(vel_max)
+        want = vel_min
+        
+    dist = np.where(r_Re == np.min(r_Re))
+    
+    yzero, xzero = find_new_center(shapemap, velocity, dist)
+    x, endx, y, endy = plot_point((xzero,yzero), pa-90)
+    
+    
+    #plots the velocity map
+    print('velocity ' + str(velocity[0,0]))
     imgplot = plt.imshow(velocity, origin = "lower", cmap = "RdYlBu_r", extent = shapemap, vmin = -vel_final, vmax = vel_final, zorder = 2)
     #adds the colorbar
     cb = plt.colorbar(shrink = .7, mappable = imgplot)
@@ -267,7 +355,7 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     global fig
     global xlim
     global ylim
-    a = fig.add_subplot(1, 3, 2)
+    a = fig.add_subplot(1, 4, 2)
     badpix = err < 3
     iband[badpix] = np.nan
     print(iband.shape)
@@ -313,7 +401,7 @@ def plot_image(plate_num, fiber_num):
     with open('/home/celeste/Documents/astro_research/astro_images/marvin_images/' + str(plate_num) + '-' + str(fiber_num) + '.png', 'wb') as fd:
         for chunk in r.iter_content(chunk_size=128):
 	        fd.write(chunk)
-    a = fig.add_subplot(1,3,1)
+    a = fig.add_subplot(1,4,1)
     try:
         image = img.imread('/home/celeste/Documents/astro_research/astro_images/marvin_images/' + str(plate_num) + '-' + str(fiber_num) + '.png')
     except ValueError:
@@ -324,7 +412,7 @@ def plot_image(plate_num, fiber_num):
     imgplot = plt.imshow(image)
     
 shapemap = [0,0,0,0]
-fig = plt.figure(figsize=(28,7), facecolor='white')
+fig = plt.figure(figsize=(35,11), facecolor='white')
 r_Re = []
 ylim = 0
 xlim = 0
@@ -335,6 +423,8 @@ files = get_filenames(filename)
 #files = ['7443-12702']
 
 for x in range(0, len(files)):
-    fig = plt.figure(figsize=(30,9), facecolor='white')
+    fig = plt.figure(figsize=(35,11), facecolor='white')
     get_plot(files[x])
     plt.close('all')
+    if x > 8:
+        sadfasdf
