@@ -57,14 +57,22 @@ def plot_point(point, angle, length=100):
 
      # unpack the first point
      x, y = point
-
+     #angle = 0
+     
+     print(point)
+     print('angle: ' +  str(angle))   
      # find the end point
      endx = length * math.sin(math.radians(angle)) + x
      endy = length * math.cos(math.radians(angle)) + y
-     x = -length * math.sin(math.radians(angle)) + x
-     y = -length * math.cos(math.radians(angle)) + y
+     beginx = -length * math.sin(math.radians(angle)) + x
+     beginy = -length * math.cos(math.radians(angle)) + y
      
-     return x, endx, y, endy
+     print(endx)
+     print(endy)
+     print(beginx)
+     print(beginy)
+     
+     return beginx, endx, beginy, endy
 
 def get_filenames(url):
     file_names = np.genfromtxt(url, usecols = (0), skip_header = 1, dtype = str, delimiter = ',')
@@ -103,8 +111,12 @@ def get_plot(iden):
     plate_number = hdulist['PRIMARY'].header['PLATEID']
     fiber_number = hdulist['PRIMARY'].header['IFUDSGN']
     velocity, velocity_err = get_buncha_data(hdulist, logcube)
+    velocity_mask = hdulist['EMLINE_GFLUX_MASK'].data[18,...]
+    velocity[velocity_mask != 0] = np.nan
     stel_vel = hdulist['STELLAR_VEL'].data
     stel_vel_err = (hdulist['STELLAR_VEL_IVAR'].data)**(-0.5)
+    star_v_mask = hdulist['STELLAR_VEL_MASK'].data
+    stel_vel[star_v_mask != 0] = np.nan
     
 
     
@@ -126,16 +138,16 @@ def get_plot(iden):
     pa = drpall[drpall['plateifu']==plate_id][0]['nsa_elpetro_phi']
     
     plot_image(plate_number, fiber_number)
-    plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err))
-    plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity)
-    plot_stellar_kin(plate_id, stel_vel, stel_vel_err, contours_i, pa, (stel_vel/stel_vel_err))
+    plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err), stel_vel, stel_vel_err)
+    plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity, velocity_err, stel_vel, stel_vel_err)
+    plot_stellar_kin(plate_id, stel_vel, stel_vel_err, contours_i, pa, (stel_vel/stel_vel_err), velocity, velocity_err)
     
     #plt.show()
     plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
     print("finished with this one")
     plt.close('all')
     
-def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err):
+def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err, gas_velocity, gas_vel_err):
     global shapemap
     global r_Re
     global fig
@@ -146,9 +158,9 @@ def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err):
     
     badpix = err < 3
     #contours_i[badpix] = np.nan
-    
-    print(velocity_err)
-    
+   
+    badpix_gas = ((gas_vel_err) > 25)
+    gas_velocity[badpix_gas] = np.nan
     badpix_vel = ((velocity_err) > 25)
     velocity[badpix_vel]=np.nan
     more_bad = (velocity / velocity_err) < 3
@@ -173,12 +185,11 @@ def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err):
     
     
     #plots the velocity map
-    print('stellar velocity ' + str(velocity[0,0]))
     imgplot = plt.imshow(velocity, origin = "lower", cmap = "RdYlBu_r", extent = shapemap, vmin = -vel_final, vmax = vel_final, zorder = 2)
     #adds the colorbar
     cb = plt.colorbar(shrink = .7, mappable = imgplot)
     #Adds a contour line for the one effective radius
-    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='springgreen', origin = 'lower', zorder = 5)
+    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='darkgreen', origin = 'lower', zorder = 5)
     #adds the contors from the i band image
     csss=plt.gca().contour(contours_i, 8, colors = 'k', alpha = 0.6, extent = shapemap, zorder = 3)
     axes = plt.gca()
@@ -197,14 +208,16 @@ def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err):
     axes.set_xlim(xlim)
     axes.set_facecolor('white')
     
-    x2, endx2, y2, endy2, bestAng = fit_kin(velocity, r_Re, offset = -90)
+    thick = 3
     
-    print(x2, endx2)
-    print(y2, endy2)
+    x2, endx2, y2, endy2, bestAng, bestAng_err = fit_kin(velocity, r_Re, offset = -90)
     
-    plt.plot([y, endy], [x, endx], color = 'darkorchid', zorder = 4, label = 'PA from data')
+    x3, endx3, y3, endy3, bestAng_gaskin, bestAng_gaskin_err = fit_kin(gas_velocity, r_Re, offset = -90)
+    
+    plt.plot([y, endy], [x, endx], color = 'darkorchid', zorder = 4, label = 'PA from photometry', linewidth = thick)
     #plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
-    plt.plot([-endy2, endy2],[-endx2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    plt.plot([y2, endy2],[x2, endx2], color = 'coral', zorder = 6, label = 'PA from stellar', linewidth = thick)
+    plt.plot([y3, endy3],[x3, endx3], color = 'turquoise', zorder = 7, label = 'PA from kinematics', linewidth = thick)
     #plt.plot([x2], [y2], color = 'turquoise', marker = '.', zorder = 6, label = 'PA from kinematics')
     #plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
     
@@ -215,7 +228,7 @@ def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err):
     plt.ylabel('Arcseconds')
     
     
-def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
+def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err, stel_vel, stel_vel_err):
     global shapemap
     global r_Re
     global fig
@@ -228,6 +241,8 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     badpix = err < 3
     contours_i[badpix] = np.nan
     
+    badpix_stelvel = ((stel_vel_err) > 25)
+    stel_vel[badpix_stelvel] = np.nan
     badpix_vel = ((velocity_err) > 25)
     velocity[badpix_vel]=np.nan
     more_bad = (velocity / velocity_err) < 3
@@ -253,12 +268,11 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     
     
     #plots the velocity map
-    print('velocity ' + str(velocity[0,0]))
     imgplot = plt.imshow(velocity, origin = "lower", cmap = "RdYlBu_r", extent = shapemap, vmin = -vel_final, vmax = vel_final, zorder = 2)
     #adds the colorbar
     cb = plt.colorbar(shrink = .7, mappable = imgplot)
     #Adds a contour line for the one effective radius
-    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='springgreen', origin = 'lower', zorder = 5)
+    css = plt.gca().contour(r_Re*2,[2], extent=shapemap, colors='darkgreen', origin = 'lower', zorder = 5)
     #adds the contors from the i band image
     csss=plt.gca().contour(contours_i, 8, colors = 'k', alpha = 0.6, extent = shapemap, zorder = 3)
     axes = plt.gca()
@@ -276,14 +290,16 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2, bestAng = fit_kin(velocity, r_Re, offset = -90)
+    x2, endx2, y2, endy2, bestAng, bestAng_err2 = fit_kin(velocity, r_Re, offset = -90)
+    x3, endx3, y3, endy3, bestAng_stelvel, bestAng_stelvel_err = fit_kin(stel_vel, r_Re, offset = 90)
     
-    print(x2, endx2)
-    print(y2, endy2)
+    thick = 3
     
-    plt.plot([y, endy], [x, endx], color = 'darkorchid', zorder = 4, label = 'PA from data')
+    
+    plt.plot([y, endy], [x, endx], color = 'darkorchid', zorder = 4, label = 'PA from photometry', linewidth = thick)
     #plt.plot([-x, -endx], [-y, -endy], color = 'darkorchid', zorder = 5)
-    plt.plot([-endy2, endy2],[-endx2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics')
+    plt.plot([y2, endy2],[x2, endx2], color = 'turquoise', zorder = 6, label = 'PA from kinematics', linewidth = thick)
+    plt.plot([y3, endy3],[x3, endx3], color = 'coral', zorder = 7, label = 'PA from stellar', linewidth = thick)
     #plt.plot([x2], [y2], color = 'turquoise', marker = '.', zorder = 6, label = 'PA from kinematics')
     #plt.plot([-x2, -endx2], [-y2, -endy2], color = 'turquoise', zorder = 7)
     
@@ -300,8 +316,8 @@ def fit_kin(velocity, r_Re, offset = 0):
     
     ybin, xbin = np.indices(velocity.shape)
     
-    ybin = ybin - dist[1]
-    xbin = xbin - dist[0]
+    ybin = ybin - dist[0]
+    xbin = xbin - dist[1]
     
     ybin = ybin.ravel()
     xbin = xbin.ravel()
@@ -310,9 +326,13 @@ def fit_kin(velocity, r_Re, offset = 0):
     
     [ybin, xbin, velocity] = reject_invalid([ybin, xbin, velocity])
     
-    angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin,velocity-np.median(velocity), nsteps = 30, plot = False)
-    
     yzero, xzero = find_new_center(shapemap, velocity_notravel, dist)
+    print('xzero in fit_kin ' + str(xzero))
+    print('yzero in fit_kin ' + str(yzero))
+    
+
+    angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin, velocity - velocity_notravel[(dist[1][0])][(dist[0][0])], nsteps = 30, plot = False)
+    
 
     '''
     print("left: " + str(left))
@@ -325,11 +345,11 @@ def fit_kin(velocity, r_Re, offset = 0):
     print("dist1: " + str(dist[1]))
     '''
     
+    print('plotting the points for the not working one')
     x2, endx2, y2, endy2 = plot_point((xzero, yzero), angBest+offset)
+    print(x2, endx2, y2, endy2)
     #return x2, endx2, y2, endy2
-    print(x2, endx2)
-    print(y2, endy2)
-    return xzero, endx2, yzero, endy2, angBest
+    return x2, endx2, y2, endy2, angBest, angErr
     
 def find_new_center(shapemap, velocity, dist):
     left = shapemap[0]
@@ -340,16 +360,13 @@ def find_new_center(shapemap, velocity, dist):
     yzero = left + width_of_shapemap/size_of_vel*(dist[0])
     xzero = right - width_of_shapemap/size_of_vel*(dist[1])
     
-    print('xzero ' + str(xzero))
-    print('yzero ' + str(yzero))
-    
     #yzero = left + width_of_shapemap/size_of_vel*(dist[0]+.5)
     #xzero = right - width_of_shapemap/size_of_vel*(dist[1]+.5)
     
     return xzero, yzero
    
     
-def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
+def plot_iband(plate_num, fiber_num, iband, err, pa, velocity, velocity_err, stel_vel, stel_vel_err):
     global shapemap
     global r_Re
     global fig
@@ -369,23 +386,40 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
     axes.set_ylim(ylim)
     axes.set_xlim(xlim)
     
-    x2, endx2, y2, endy2, bestAng = fit_kin(velocity, r_Re, offset = -90)
+    badpix_stelvel = ((stel_vel_err) > 25)
+    stel_vel[badpix_stelvel] = np.nan
+    badpix_vel = ((velocity_err) > 25)
+    velocity[badpix_vel]=np.nan
     
-    print(x2, endx2)
-    print(y2, endy2)
+    
+    x2, endx2, y2, endy2, bestAng, angErr = fit_kin(velocity, r_Re, offset = -90)
+    x3, endx3, y3, endy3, bestAng_stel_vel, angErr3 = fit_kin(stel_vel, r_Re, offset = -90)
+    
+    print('current: ', x2, endx2, y2, endy2)
     
     dist = np.where(r_Re == np.min(r_Re))
     print(dist[0])
     print(dist[1])
     yzero, xzero = find_new_center(shapemap, velocity, dist)
+    print('xzero in plot_iband ' + str(xzero))
+    print('yzero in plot_iband ' + str(yzero))
+    print('plotting the points for the working one')
     x, endx, y, endy = plot_point((xzero,yzero), pa+90)
+    
+    thick = 3
+    
+    pa = iround(pa)
+    bestAng = iround(bestAng)
+    bestAng_stel_vel = iround(bestAng_stel_vel)
+    angErr = iround(angErr)
     
     
     #data = plt.plot([x, endx], [y, endy], color = 'darkorchid', label = "PA from data", zorder = 5)
-    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data: " + str(pa))
+    data = plt.plot([y, endy], [x, endx], color = 'darkorchid', label = "PA from data: " + str(pa) + "$\degree$ $\pm$" + str(angErr) + "$\degree$", linewidth = thick)
     #kinematics = plt.plot([x2, endx2],[y2, endy2], color = 'turquoise', zorder = 5, label = "PA from kinematics")
     #kinematics = plt.plot([y2],[x2], color = 'turquoise', marker = '.', zorder = 5, label = "PA from kinematics")
-    kinematics = plt.plot([-endy2, endy2],[-endx2, endx2], color = 'turquoise', zorder = 6, label = "PA from kinematics: " + str(bestAng))
+    kinematics = plt.plot([y2, endy2],[x2, endx2], color = 'turquoise', zorder = 6, label = "PA from kinematics: " + str(bestAng) + "$\degree$", linewidth = thick)
+    plt.plot([y3, endy3],[x3, endx3], color = 'coral', zorder = 7, label = 'PA from stellar: ' + str(bestAng_stel_vel) + "$\degree$", linewidth = thick)
     #axes.invert_yaxis()
     plt.legend(prop={'size': 12})
 
@@ -393,6 +427,11 @@ def plot_iband(plate_num, fiber_num, iband, err, pa, velocity):
 
 
     plt.title("i-band Image")
+    
+def iround(x):
+    """iround(number) -> integer
+    Round a number to the nearest integer."""
+    return int(round(x) - .5) + (x > 0)
     
 def plot_image(plate_num, fiber_num):
     r = requests.get('https://data.sdss.org/sas/mangawork/manga/spectro/redux/v2_4_3/' + str(plate_num) + '/stack/images/' + str(fiber_num) + '.png', auth=('sdss', '2.5-meters'))
@@ -426,5 +465,5 @@ for x in range(0, len(files)):
     fig = plt.figure(figsize=(35,11), facecolor='white')
     get_plot(files[x])
     plt.close('all')
-    if x > 8:
-        sadfasdf
+    if x > 9:
+        asf
