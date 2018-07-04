@@ -213,6 +213,9 @@ failed_other = "failed_TYPERROR\n"
 expec = []
 calc = []
 names = []
+calc_err = []
+y_calc = []
+y_expec = []
 
 for i in range(0, len(plate_num)): ##len(plate_num)
         #Just prints out the id of the galaxy. Prints out to the console so you can see what galaxy the code is on
@@ -313,6 +316,8 @@ for i in range(0, len(plate_num)): ##len(plate_num)
         
         slope_expected = (yfit[1]-yfit[0])/(r_Re.flatten()[idx][indarr][1]-r_Re.flatten()[idx][indarr][0])
         
+        y_int_expected = yfit[1]-slope_expected*r_Re.flatten()[idx][indarr][1]
+        
         def func(x, m, b):
             return m*x+b
         
@@ -321,6 +326,8 @@ for i in range(0, len(plate_num)): ##len(plate_num)
         rad_pix=hdulist['SPX_ELLCOO'].data[0,:,:]*2.0 #since there are 2 pixels/arcsec
         rad, rp, n, sig =radial_profile(image=logOH12,distarr=rad_pix, radtype = 'weighted')
         rad=rad/(2*Re) #This is now in units of Re.
+        rad_err, rp_err, n_err, sig_err =radial_profile(image=logOH12error,distarr=rad_pix, radtype = 'weighted')
+        rad_err = rad_err/(2*Re) #This is now in units of Re.
         valid = ~(np.isnan(rad) | np.isnan(rp) | np.isinf(rad) | np.isinf(rp) | ((rad < .5) | (rad > 2) ) | (n < 5))
         
         try:
@@ -334,17 +341,39 @@ for i in range(0, len(plate_num)): ##len(plate_num)
             plt.close('all')
             count_continue=count_continue3+1
             continue
+            
+        try:
+            #creating the line fit
+            popt_err, pcov_err = curve_fit(func, rad_err[valid], rp_err[valid], check_finite = True)
+        except TypeError:
+            print("Improper input: N=2 must not exceed M=0")
+            failed_other = failed_other + str(plate_num[i]) + "-" + str(fiber_num[i]) + "\n"
+            print("failed on the TYPE ERROR.")
+            print("==========================================================================================")
+            plt.close('all')
+            count_continue=count_continue3+1
+            continue
         
         slope_calculated = (func(rad[valid], *popt)[1]-func(rad[valid], *popt)[0])/(rad[valid][1]-rad[valid][0])
+        slope_calculated_err = (func(rad_err[valid], *popt_err)[1]-func(rad_err[valid], *popt_err)[0])/(rad_err[valid][1]-rad_err[valid][0])
+        
+        y_int_calculated = func(rad[valid], *popt)[1]-(slope_calculated*rad[valid][1])
+        
         names.append(plateifu)
         calc.append(slope_calculated)
         expec.append(slope_expected)
+        calc_err.append(slope_calculated_err)
+        y_calc.append(y_int_calculated)
+        y_expec.append(y_int_expected)
         
         
 #create the table
 names = np.array(names)
 expec = np.array(expec)
 calc = np.array(calc)
+calc_err = np.array(calc_err)
+y_calc = np.array(y_calc)
+y_expec = np.array(y_expec)
 print(names)
 print(expec)
 print(calc)
@@ -353,5 +382,8 @@ t=Table()
 t['NAMES'] = Column(names, description = 'MaNGA PlateIFU' )
 t['EXPECTED'] = Column(expec, description = 'gradient expected')
 t['CALCULATED'] = Column(calc, description = 'gradient calculate')
+t['CALCULATED_ERR'] = Column(calc_err, description = 'error on the expected gradient')
+t['Y_INT_CALC'] = Column(y_calc, description = 'y intercept of the calculated gradient')
+t['Y_INT_EXPEC'] = Column(y_expec, description = 'y intercept of the expected gradient')
 
-t.write('/home/celeste/Documents/astro_research/summer_2018/slopes.fits')
+t.write('/home/celeste/Documents/astro_research/summer_2018/slopesv2.fits')
