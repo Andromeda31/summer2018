@@ -9,7 +9,7 @@ names = slopes[1].data['Y_INT_CALC']
 expec = slopes[1].data['Y_INT_EXPEC']
 calc = slopes[1].data['CALCULATED_ERR']
 
-print(slopes[1])
+print(slopes[1].header)
 print(names.size)
 print(expec.size)
 print(calc.size)

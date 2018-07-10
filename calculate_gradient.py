@@ -214,8 +214,12 @@ expec = []
 calc = []
 names = []
 calc_err = []
+expec_err = []
 y_calc = []
 y_expec = []
+y_mass = []
+mass_arr = []
+mass_grad = []
 
 for i in range(0, len(plate_num)): ##len(plate_num)
         #Just prints out the id of the galaxy. Prints out to the console so you can see what galaxy the code is on
@@ -308,15 +312,26 @@ for i in range(0, len(plate_num)): ##len(plate_num)
         
         #finds the indices where the arrays are infinity
         idx = np.isfinite(r_Re.flatten()) & np.isfinite(logOH12.flatten())
+        idx_err = np.isfinite(r_Re.flatten()) & np.isfinite(logOH12error.flatten())
         #Sorts the array
         indarr=np.argsort(r_Re.flatten()[idx])
+        indarr_err = np.argsort(r_Re.flatten()[idx_err])
         
         #Fits a line to the sorted effective radius array
         yfit = [b + m * xi for xi in r_Re.flatten()[idx][indarr]]
+        yfit_err = [b + m * xi for xi in r_Re.flatten()[idx_err][indarr_err]]
         
         slope_expected = (yfit[1]-yfit[0])/(r_Re.flatten()[idx][indarr][1]-r_Re.flatten()[idx][indarr][0])
+        slope_expected_err = (yfit_err[1]-yfit_err[0])/(r_Re.flatten()[idx_err][indarr_err][1]-r_Re.flatten()[idx_err][indarr_err][0])
         
         y_int_expected = yfit[1]-slope_expected*r_Re.flatten()[idx][indarr][1]
+        
+        p_grad=np.poly1d([0.04477852,-1.32279522,12.93676181,-42.02882191])
+        p_int=np.poly1d([ -0.03036036,0.81782123,-6.83415102,25.60820575])
+        
+        expec_mass = p_grad(mass)
+        expec_mass_int = p_int(mass)
+        
         
         def func(x, m, b):
             return m*x+b
@@ -363,8 +378,12 @@ for i in range(0, len(plate_num)): ##len(plate_num)
         calc.append(slope_calculated)
         expec.append(slope_expected)
         calc_err.append(slope_calculated_err)
+        expec_err.append(slope_expected_err)
         y_calc.append(y_int_calculated)
         y_expec.append(y_int_expected)
+        mass_arr.append(mass)
+        mass_grad.append(expec_mass)
+        y_mass.append(expec_mass_int)
         
         
 #create the table
@@ -374,6 +393,7 @@ calc = np.array(calc)
 calc_err = np.array(calc_err)
 y_calc = np.array(y_calc)
 y_expec = np.array(y_expec)
+expec_err = np.array(expec_err)
 print(names)
 print(expec)
 print(calc)
@@ -382,8 +402,12 @@ t=Table()
 t['NAMES'] = Column(names, description = 'MaNGA PlateIFU' )
 t['EXPECTED'] = Column(expec, description = 'gradient expected')
 t['CALCULATED'] = Column(calc, description = 'gradient calculate')
-t['CALCULATED_ERR'] = Column(calc_err, description = 'error on the expected gradient')
+t['CALCULATED_ERR'] = Column(calc_err, description = 'error on the calculated gradient')
+t['EXPECTED_ERR'] = Column(expec_err, description = 'error on the expected gradient')
 t['Y_INT_CALC'] = Column(y_calc, description = 'y intercept of the calculated gradient')
+t['Y_INT_MASS'] = Column(y_expec, description = 'y intercept with the mass from Adam')
 t['Y_INT_EXPEC'] = Column(y_expec, description = 'y intercept of the expected gradient')
+t['MASS'] = Column(y_expec, description = 'just the mass of the galaxy')
+t['MASS_GRAD'] = Column(y_expec, description = 'gradient from the mass from the polynomial from Adam')
 
-t.write('/home/celeste/Documents/astro_research/summer_2018/slopesv2.fits')
+t.write('/home/celeste/Documents/astro_research/summer_2018/slopesv4.fits')
