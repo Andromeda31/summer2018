@@ -138,14 +138,22 @@ def get_plot(iden):
     pa = drpall[drpall['plateifu']==plate_id][0]['nsa_elpetro_phi']
     
     plot_image(plate_number, fiber_number)
-    plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err), stel_vel, stel_vel_err)
+    stellar_kin_pa, gas_kin_pa, pa_from_data = plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err), stel_vel, stel_vel_err)
     plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity, velocity_err, stel_vel, stel_vel_err)
     plot_stellar_kin(plate_id, stel_vel, stel_vel_err, contours_i, pa, (stel_vel/stel_vel_err), velocity, velocity_err)
     
     #plt.show()
-    plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
+    #plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
+    
+    print('stellar kin: ' + str(stellar_kin_pa))
+    print('gas kin: ' + str(gas_kin_pa))
+    print('data kin: ' + str(pa_from_data))
     print("finished with this one")
     plt.close('all')
+    
+    
+    
+    return stellar_kin_pa, gas_kin_pa, pa_from_data
     
 def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err, gas_velocity, gas_vel_err):
     global shapemap
@@ -309,6 +317,8 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err, stel_
     plt.xlabel('Arcseconds')
     plt.ylabel('Arcseconds')
     
+    return bestAng_stelvel, bestAng, pa-90
+    
 def fit_kin(velocity, r_Re, offset = 0):
     global shapemap
     dist = np.where(r_Re == np.min(r_Re))
@@ -463,7 +473,7 @@ files = get_filenames(filename)
 
 for x in range(0, len(files)):
     fig = plt.figure(figsize=(35,11), facecolor='white')
-    get_plot(files[x])
+    stel_pa, gas_pa, pa = get_plot(files[x])
     plt.close('all')
     if x > 9:
         asf
