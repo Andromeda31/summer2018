@@ -84,6 +84,7 @@ def get_hdu(iden):
     except FileNotFoundError:
         print("failed on the MAPS file.")
         print("------------------------------------------")
+        hdulist = 0
     return hdulist
     
 def get_logcube(iden):
@@ -106,6 +107,8 @@ def get_plot(iden):
     global fig
     print('Doing file ' + str(iden) + '.') 
     hdulist = get_hdu(iden)
+    if hdulist == 0:
+        return 0, 0, 0
     logcube = get_logcube(iden)
     plate_id = hdulist['PRIMARY'].header['PLATEIFU']
     plate_number = hdulist['PRIMARY'].header['PLATEID']
@@ -138,22 +141,16 @@ def get_plot(iden):
     pa = drpall[drpall['plateifu']==plate_id][0]['nsa_elpetro_phi']
     
     plot_image(plate_number, fiber_number)
-    stellar_kin_pa, gas_kin_pa, pa_from_data = plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err), stel_vel, stel_vel_err)
+    plot_kinematics(plate_id, velocity, velocity_err, contours_i, pa, (Ha/Ha_err), stel_vel, stel_vel_err)
     plot_iband(plate_number, fiber_number, contours_i, (Ha/Ha_err), pa, velocity, velocity_err, stel_vel, stel_vel_err)
     plot_stellar_kin(plate_id, stel_vel, stel_vel_err, contours_i, pa, (stel_vel/stel_vel_err), velocity, velocity_err)
     
     #plt.show()
-    #plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
-    
-    print('stellar kin: ' + str(stellar_kin_pa))
-    print('gas kin: ' + str(gas_kin_pa))
-    print('data kin: ' + str(pa_from_data))
+    plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
+
     print("finished with this one")
     plt.close('all')
     
-    
-    
-    return stellar_kin_pa, gas_kin_pa, pa_from_data
     
 def plot_stellar_kin(plateifu, velocity, velocity_err, contours_i, pa, err, gas_velocity, gas_vel_err):
     global shapemap
@@ -317,8 +314,6 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err, stel_
     plt.xlabel('Arcseconds')
     plt.ylabel('Arcseconds')
     
-    return bestAng_stelvel, bestAng, pa-90
-    
 def fit_kin(velocity, r_Re, offset = 0):
     global shapemap
     dist = np.where(r_Re == np.min(r_Re))
@@ -465,15 +460,21 @@ fig = plt.figure(figsize=(35,11), facecolor='white')
 r_Re = []
 ylim = 0
 xlim = 0
+stel = []
+gas = []
+data = []
     
+
 filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
 files = get_filenames(filename)
 
-#files = ['7443-12702']
+files = ['8139-1901']
 
-for x in range(0, len(files)):
+for x in range(246, len(files)):
+    print("number " + str(x+1))
     fig = plt.figure(figsize=(35,11), facecolor='white')
-    stel_pa, gas_pa, pa = get_plot(files[x])
+    get_plot(files[x])
+
     plt.close('all')
-    if x > 9:
-        asf
+        
+        
