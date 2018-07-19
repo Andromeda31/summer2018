@@ -143,7 +143,7 @@ def get_plot(iden):
     if pa_from_data != np.nan:
         pa_from_data = pa_from_data + 90
     else:
-        return 1,1,1,1,1,1,1
+        return 1,1,1,1,1,1, plate_id
 
     pa_err = np.nan
     
@@ -209,7 +209,9 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err, stel_
     #If all the velocities are less than zero, we make sure to get all of the correct velocities on the plot. 
     '''
     print('--------------2-----------------')
+    '''
     x2, endx2, y2, endy2, bestAng, bestAng_err2 = fit_kin(velocity, r_Re, offset = -90)
+    '''
     print('--------------3-----------------')
     #print(stel_vel)
     #print(stel_vel.shape)
@@ -218,11 +220,11 @@ def plot_kinematics(plateifu, velocity, velocity_err, contours_i, pa, err, stel_
     x3, endx3, y3, endy3, bestAng_stelvel, bestAng_stelvel_err = fit_kin(stel_vel, r_Re, offset = 90)
     
     if x == np.nan:
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
     if x2 == np.nan:
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
     if x3 == np.nan:
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
     
     
     return bestAng_stelvel, bestAng, pa-90, bestAng_stelvel_err, bestAng_err2
@@ -317,6 +319,8 @@ stel = []
 gas = []
 data = []
 gal_id = []
+gas_error = []
+stel_error = []
     
 
 filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
@@ -326,7 +330,7 @@ files = get_filenames(filename)
 for x in range(0, len(files)):
     print("number " + str(x+1))
     fig = plt.figure(figsize=(35,11), facecolor='white')
-    stel_pa, gas_pa, pa, stel_pa, gas_pa, pa_err, plate_id = get_plot(files[x])
+    stel_pa, gas_pa, pa, stel_err, gas_err, pa_err, plate_id = get_plot(files[x])
     if stel_pa == 0:
         if gas_pa == 0:
             if pa == 0:
@@ -354,6 +358,8 @@ for x in range(0, len(files)):
     stel.append(stel_pa)
     gas.append(gas_pa)
     data.append(pa)  
+    gas_error.append(gas_err)
+    stel_error.append(stel_err)
     gal_id.append(plate_id)
         
         
@@ -361,10 +367,14 @@ stel = np.array(stel)
 gas = np.array(gas)
 data = np.array(data)
 gal_id = np.array(gal_id)
+stel_error = np.array(stel_error)
+gas_error = np.array(gas_error)
         
 t = Table()
 t['STEL_PA'] = Column(stel, description = 'Stellar position angle' )
+t['STEL_PA_ERR'] = Column(stel_error, description = 'Stellar position angle error' )
 t['GAS_PA'] = Column(gas, description = 'Position angle calculated from the gas')
+t['GAS_PA_ERR'] = Column(gas_error, description = 'Position angle calculated from the gas error')
 t['PA'] = Column(data, description = 'Position angle from the MaNGA data')
 t['GALAXY_ID'] = Column(gal_id, description = 'galaxy ID')
 
