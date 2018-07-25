@@ -146,7 +146,7 @@ def get_plot(iden):
     plot_stellar_kin(plate_id, stel_vel, stel_vel_err, contours_i, pa, (stel_vel/stel_vel_err), velocity, velocity_err)
     
     #plt.show()
-    plt.savefig('/home/celeste/Documents/astro_research/position_angle/pa_' + str(plate_id) + '.png')
+    plt.savefig('/home/celeste/Documents/astro_research/position_angle/large_pa/pa_' + str(plate_id) + '.png')
 
     print("finished with this one")
     plt.close('all')
@@ -465,15 +465,17 @@ gas = []
 data = []
     
 
-filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
-files = get_filenames(filename)
+#filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
+slopes = fits.open('/home/celeste/Documents/astro_research/summer_2018/pa_off50v1.fits')
+iden = slopes[1].data['OFF_50']
 
-files = ['8139-1901']
+#files = ['8139-1901']
+files = ['9881-12701']
 
-for x in range(246, len(files)):
+for x in range(0, len(iden)):
     print("number " + str(x+1))
     fig = plt.figure(figsize=(35,11), facecolor='white')
-    get_plot(files[x])
+    get_plot(iden[x])
 
     plt.close('all')
         

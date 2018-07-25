@@ -109,8 +109,10 @@ def get_plot(iden):
     global fig
     print('Doing file ' + str(iden) + '.') 
     hdulist = get_hdu(iden)
+    should_save = True
     if hdulist == 0:
-        return 0, 0, 0, 0, 0, 0, 0
+        should_save = False
+        return 0, 0, 0, 0, 0, 0, 0, should_save
     logcube = get_logcube(iden)
     plate_id = hdulist['PRIMARY'].header['PLATEIFU']
     velocity, velocity_err = get_buncha_data(hdulist, logcube)
@@ -143,6 +145,7 @@ def get_plot(iden):
     if pa_from_data != np.nan:
         pa_from_data = pa_from_data + 90
     else:
+        should_save = False
         return 1,1,1,1,1,1, plate_id
 
     pa_err = np.nan
@@ -155,7 +158,7 @@ def get_plot(iden):
     
     
     
-    return stellar_kin_pa, gas_kin_pa, pa_from_data, stellar_kin_pa_err, gas_kin_pa_err, pa_err, plate_id
+    return stellar_kin_pa, gas_kin_pa, pa_from_data, stellar_kin_pa_err, gas_kin_pa_err, pa_err, plate_id, should_save
     
 
     
@@ -248,20 +251,9 @@ def fit_kin(velocity, r_Re, offset = 0):
     
     yzero, xzero = find_new_center(shapemap, velocity_notravel, dist)
 
-    '''
-    print('------------')
-    print('xbin: ')
-    print(xbin)
-    print('ybin: ')
-    print(ybin)
-    print('velocity minus')
-    print(velocity - velocity_notravel[(dist[1][0])][(dist[0][0])])
-    print('dist: ')
-    print(dist)
-    print('--------------')
-    '''
     try:
         angBest, angErr, vSyst = fit_kinematic_pa(xbin, ybin, velocity - velocity_notravel[(dist[1][0])][(dist[0][0])], nsteps = 361, plot = False)
+        angErr = angErr/3.
     except ValueError:
         print("Have empty xbin and ybins. Must continue")
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
@@ -326,11 +318,18 @@ stel_error = []
 filename = '/home/celeste/Documents/astro_research/thesis_git/Good_Galaxies_SPX_3_N2S2.txt'
 files = get_filenames(filename)
 
+how_many_bad = 0
+bad_gala = []
+
+print(len(files))
+asdfsa
+
 
 for x in range(0, len(files)):
     print("number " + str(x+1))
     fig = plt.figure(figsize=(35,11), facecolor='white')
-    stel_pa, gas_pa, pa, stel_err, gas_err, pa_err, plate_id = get_plot(files[x])
+    stel_pa, gas_pa, pa, stel_err, gas_err, pa_err, plate_id, should_save = get_plot(files[x])
+    '''
     if stel_pa == 0:
         if gas_pa == 0:
             if pa == 0:
@@ -353,6 +352,12 @@ for x in range(0, len(files)):
                 pa_err = np.nan
                 print("failed on that weird error on line 257.")
                 continue
+    '''
+    if should_save == False:
+        print('maaaaaaaaaaaaaaaaaaaaaaaaaa')
+        how_many_bad = how_many_bad + 1
+        bad_gala.append(plate_id)
+        continue
     print("stellar_pa: " + str(stel_pa))
     plt.close('all')
     stel.append(stel_pa)
@@ -369,6 +374,8 @@ data = np.array(data)
 gal_id = np.array(gal_id)
 stel_error = np.array(stel_error)
 gas_error = np.array(gas_error)
+bad = np.array([how_many_bad])
+bad_gals = np.array(bad_gals)
         
 t = Table()
 t['STEL_PA'] = Column(stel, description = 'Stellar position angle' )
@@ -377,5 +384,7 @@ t['GAS_PA'] = Column(gas, description = 'Position angle calculated from the gas'
 t['GAS_PA_ERR'] = Column(gas_error, description = 'Position angle calculated from the gas error')
 t['PA'] = Column(data, description = 'Position angle from the MaNGA data')
 t['GALAXY_ID'] = Column(gal_id, description = 'galaxy ID')
+t['NUM_BAD_GALS'] = Column(bad, description = "For Celeste's testing, ignore")
+t['BAD_GALS_NAMES'] = Column(bad_gals, description = "For Celeste's testing, ignore")
 
-t.write('/home/celeste/Documents/astro_research/summer_2018/pa_datav3.fits')
+t.write('/home/celeste/Documents/astro_research/summer_2018/pa_datav5.fits')
