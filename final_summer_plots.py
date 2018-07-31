@@ -13,7 +13,7 @@ badpix50 = (stel - gas <= 50)
 badpix_all = (stel - gas >= 30)
 '''
 
-def big_loop(stel, gas, stel_err, gas_err, name):
+def big_loop(stel, gas, stel_err, gas_err, name, xname, yname):
     minus = np.absolute(stel - gas)
 
     badpix30 = ((minus <= 30) | (minus > 40))
@@ -68,8 +68,8 @@ def big_loop(stel, gas, stel_err, gas_err, name):
     ax1.errorbar(stel40, gas40, xerr=stel_err/3, yerr=gas_err/3, capsize = 0, color = "black", fmt=None)
     ax1.errorbar(stel50, gas50, xerr=stel_err/3, yerr=gas_err/3, capsize = 0, color = "black", fmt=None)
     plt.title("Gas Position Angle vs Stellar Position Angle")
-    plt.xlabel("Stellar PA")
-    plt.ylabel('Gas PA')
+    plt.xlabel(str(xname) + " PA")
+    plt.ylabel(str(yname) + ' PA')
 
     plt.savefig('/home/celeste/Documents/astro_research/summer_2018/' + str(name) + '_pa_nocaps.png')
     plt.close('all')
@@ -92,6 +92,6 @@ gas_err = np.asarray(gas_err)
 pa = np.asarray(pa)
 iden = np.asarray(iden)
 
-big_loop(stel, gas, stel_err, gas_err, 'stel_vs_gas')
-big_loop(pa, stel, 0, stel_err, 'drpall_vs_stel')
-big_loop(gas, pa, gas_err, 0, 'gas_vs_drpall')
+big_loop(stel, gas, stel_err, gas_err,'stel_vs_gas', 'Stellar', 'Gas')
+big_loop(pa, stel, 0, stel_err, 'drpall_vs_stel', 'DRPall', 'Stellar')
+big_loop(gas, pa, gas_err, 0, 'gas_vs_drpall', 'Gas', 'DRPall')
